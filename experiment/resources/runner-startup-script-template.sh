@@ -13,6 +13,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{% if sif_dir %}
+# Singularity/Apptainer: singularity/run_experiment.sh runs this on the host.
+# SIF images are read-only, so the corpus and the runner's working directory
+# (results/, corpus-archives/) go to a writable trial directory at /trial.
+TRIAL_DIR=${FUZZBENCH_TRIALS_DIR:-/tmp/fuzzbench-trials}/{{experiment}}/{{trial_id}}
+mkdir -p $TRIAL_DIR/corpus $TRIAL_DIR/seeds
+cat > $TRIAL_DIR/env <<EOF
+INSTANCE_NAME={{instance_name}}
+FUZZER={{fuzzer}}
+BENCHMARK={{benchmark}}
+EXPERIMENT={{experiment}}
+TRIAL_ID={{trial_id}}
+TRIAL_GROUP_NUM={{trial_group_num}}
+MICRO_EXPERIMENT={{micro_experiment}}
+MAX_TOTAL_TIME={{max_total_time}}
+SNAPSHOT_PERIOD={{snapshot_period}}
+NO_SEEDS={{no_seeds}}
+NO_DICTIONARIES={{no_dictionaries}}
+OSS_FUZZ_CORPUS={{oss_fuzz_corpus}}
+CUSTOM_SEED_CORPUS_DIR={{custom_seed_corpus_dir}}
+DOCKER_REGISTRY={{docker_registry}}
+EXPERIMENT_FILESTORE={{experiment_filestore}}
+REPORT_FILESTORE={{report_filestore}}
+FUZZ_TARGET={{fuzz_target}}
+PRIVATE={{private}}
+LOCAL_EXPERIMENT={{local_experiment}}
+OUTPUT_CORPUS_DIR=/trial/corpus
+SEED_CORPUS_DIR=/trial/seeds
+EOF
+
+{% if cpuset %}taskset -c {{cpuset}} {% endif %}singularity run \
+--cleanenv --no-home --writable-tmpfs \
+--bind $TRIAL_DIR:/trial --pwd /trial \
+--bind {{experiment_filestore}} --bind {{report_filestore}} \
+--env-file $TRIAL_DIR/env \
+{{sif_dir}}/runners/{{fuzzer}}/{{benchmark}}.sif 2>&1 | tee $TRIAL_DIR/runner-log.txt
+exit
+{% endif %}
 # Configure the host.
 
 # Make everything ptrace-able.

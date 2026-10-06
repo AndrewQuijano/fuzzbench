@@ -14,7 +14,9 @@
 """Google cloud related code."""
 
 import enum
+import os
 import posixpath
+import shutil
 import subprocess
 from typing import List, Optional
 
@@ -129,6 +131,15 @@ def set_default_project(cloud_project: str):
 def run_local_instance(startup_script: Optional[str] = None) -> bool:
     """Does the equivalent of "create_instance" for local experiments, runs
     |startup_script| in the background."""
+    spool_dir = os.getenv('FUZZBENCH_SPOOL_DIR')
+    if spool_dir:
+        # A Singularity container can't start other containers, so hand the
+        # script to singularity/run_experiment.sh, which runs it on the host.
+        spooled_script = os.path.join(spool_dir,
+                                      os.path.basename(startup_script))
+        shutil.copy(startup_script, spooled_script + '.tmp')
+        os.rename(spooled_script + '.tmp', spooled_script)
+        return True
     command = ['/bin/bash', startup_script]
     # pylint: disable=consider-using-with
     subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
