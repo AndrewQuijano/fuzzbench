@@ -21,6 +21,7 @@ WORKDIR $WORK
 
 # Install runtime dependencies for benchmarks, easy json parsing, and fuzzbench.
 RUN apt-get update -y && apt-get install -y \
+    git \
     jq \
     libglib2.0-0 \
     libxml2 \

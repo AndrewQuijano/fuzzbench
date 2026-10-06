@@ -39,6 +39,8 @@ from experiment import run_experiment
 
 if not experiment_utils.is_local_experiment():
     import experiment.build.gcb_build as buildlib
+elif os.getenv('SIF_DIR'):
+    import experiment.build.singularity_build as buildlib
 else:
     import experiment.build.local_build as buildlib
 

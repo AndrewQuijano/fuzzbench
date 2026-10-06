@@ -779,6 +779,7 @@ def render_startup_script_template(  # pylint: disable=too-many-arguments
         'private': experiment_config['private'],
         'cpuset': cpuset,
         'custom_seed_corpus_dir': experiment_config['custom_seed_corpus_dir'],
+        'sif_dir': os.getenv('SIF_DIR'),
     }
 
     if not local_experiment:
