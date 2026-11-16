@@ -11,13 +11,15 @@ Run the small experiment below on the server before starting a campaign.
 
 ## Server prerequisites
 
-Use Linux, rootless Podman, Git, Make, and Python **3.10** with venv support.
+Use Linux, rootless Podman, Git, Make, curl, and Python **3.9 or 3.10** with venv support.
 This FuzzBench revision pins old packages, including NumPy and pandas; newer
 Python versions may not install them. Install the **real Docker CLI** as well:
 it is an API client here, with no Docker daemon. Use a CLI that supports API
 1.40 (for example Docker CLI 20.10 through 28; newer CLIs may raise their minimum).
 A `docker` alias or the
-`podman-docker` shim is not sufficient. The dispatcher gets its own Docker CLI.
+`podman-docker` shim is not sufficient. `setup.sh` downloads Docker CLI 20.10.24
+to `~/.local/bin/docker` if a real Docker client is missing. It installs only
+the client. The dispatcher gets its own Docker CLI.
 
 Podman's Docker-compatible API lets FuzzBench retain its existing build code.
 The launcher fixes the API version at 1.40 and disables BuildKit. Both host and
@@ -52,13 +54,29 @@ cd ~/fuzzbench
 python3 podman/prepare.py ~/fuzzbench-rootless
 cd ~/fuzzbench-rootless
 git diff                        # review the isolated changes
-python3.10 -m venv .venv
+bash podman/setup.sh
 source .venv/bin/activate
-python -m pip install --upgrade pip setuptools
-python -m pip install -r requirements.txt
 python podman/run.py check
 python podman/run.py build
 ```
+
+`setup.sh` reuses an existing `.venv`, or creates one using Python 3.10 then 3.9
+when available. Select an interpreter with `PYTHON=python3.10 bash podman/setup.sh`.
+It pins setuptools to 75.8.0 and checks the old Google logging imports. Prepared
+requirements also pin setuptools for container builds and Make-created venvs.
+The launcher automatically includes `~/.local/bin` in its PATH; no shell profile
+edit is needed. To use the downloaded client directly, run
+`export PATH="$HOME/.local/bin:$PATH"` in your shell.
+
+The adapter disables BuildKit in the Makefile generator and passes
+`DOCKER_BUILDKIT=0` to host and dispatcher Make commands. An environment variable
+alone is insufficient because upstream's generated Makefile overrides it.
+`run` checks for the dispatcher image and tells you to build it if missing.
+
+If you already prepared a checkout with an older adapter, prepare a **new**
+directory (for example `~/fuzzbench-rootless-v2`) from the updated original
+checkout and run setup/build there. Existing prepared directories are never
+overwritten. Keep using the same external data paths with a new experiment name.
 
 `build` builds the base and dispatcher images, then probes Docker API access
 from inside the dispatcher and tests `taskset`. Benchmark/fuzzer images are built

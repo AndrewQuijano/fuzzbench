@@ -18,6 +18,15 @@ def adapt(root):
             raise ValueError(f'{name}: expected exactly one occurrence of {before!r}')
         changes[name] = text.replace(before, after)
 
+    replace('docker/generate_makefile.py',
+            'export DOCKER_BUILDKIT := 1', 'export DOCKER_BUILDKIT := 0')
+    # Pin in the prepared requirements too: base/dispatcher images and Make's
+    # virtualenv must retain pkg_resources, not just the host's virtualenv.
+    replace('requirements.txt', 'alembic==1.8.1',
+            'setuptools==75.8.0\nalembic==1.8.1')
+    replace('experiment/build/local_build.py',
+            "command = ['make', '-j'] + targets",
+            "command = ['make', 'DOCKER_BUILDKIT=0', '-j'] + targets")
     replace('experiment/run_experiment.py',
             "'/var/run/docker.sock:/var/run/docker.sock',",
             "os.environ['FUZZBENCH_PODMAN_SOCKET'] + "

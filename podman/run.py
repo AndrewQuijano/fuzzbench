@@ -13,9 +13,11 @@ import sys
 def environment():
     if os.geteuid() == 0:
         raise RuntimeError('Run as your normal user, without sudo.')
+    os.environ['PATH'] = str(Path.home() / '.local/bin') + os.pathsep + os.environ.get('PATH', '')
     for executable in ('podman', 'docker', 'make', 'git'):
         if not shutil.which(executable):
-            raise RuntimeError(f'Missing {executable}; docker must be the real Docker CLI.')
+            raise RuntimeError(f'Missing {executable}; run bash podman/setup.sh first. '
+                               'docker must be the real Docker CLI.')
     info = json.loads(subprocess.check_output(['podman', 'info', '--format=json']))
     if not info['host']['security']['rootless']:
         raise RuntimeError('Podman is not rootless.')
@@ -56,7 +58,8 @@ def main():
         print('Rootless API reachable. Available CPU IDs:', env['FUZZBENCH_CPU_LIST'])
         return
     if args.action == 'build':
-        subprocess.run(['make', '-j1', 'dispatcher-image'], env=env, check=True)
+        subprocess.run(['make', 'DOCKER_BUILDKIT=0', '-j1', 'dispatcher-image'],
+                       env=env, check=True)
         # Verify both API access from the dispatcher and taskset before spending
         # time building benchmark/fuzzer combinations.
         subprocess.run(['docker', 'run', '--rm', '--security-opt=label=disable',
@@ -73,6 +76,12 @@ def main():
         parser.error('Runner and measurer counts exceed your CPU affinity allocation.')
     if not extra:
         parser.error('Pass experiment arguments after -- (see README.md).')
+    image = subprocess.run(['docker', 'image', 'inspect',
+                            'gcr.io/fuzzbench/dispatcher-image'], env=env,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if image.returncode:
+        raise RuntimeError('Dispatcher image missing or inaccessible. '
+                           'Run python podman/run.py build first.')
     command = [sys.executable, 'experiment/run_experiment.py',
                '--allow-uncommitted-changes',
                '--runners-cpus', str(args.runners_cpus),
