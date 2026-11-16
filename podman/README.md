@@ -150,6 +150,8 @@ physical cores with other campaigns when measuring fuzzer performance.
 
 - Mounts the actual user Podman socket at the dispatcher's expected Docker path
   and passes API settings into the dispatcher.
+- Extracts the source archive with `tar --no-same-owner` so host numeric UIDs
+  outside the rootless user namespace do not cause dispatcher startup to fail.
 - Disables SELinux container labeling for dispatcher and shared-volume helper/
   trial containers, as needed for the socket and sibling bind mounts.
 - Removes local privileged mode and writes to host `ptrace_scope`/`core_pattern`.

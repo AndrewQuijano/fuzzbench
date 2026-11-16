@@ -1,11 +1,13 @@
 """Focused adapter checks against this checkout; needs Jinja2, no engine."""
 import ast
+import io
 import os
 from pathlib import Path
 import queue
 import shutil
 import subprocess
 import tempfile
+import tarfile
 import types
 import unittest
 
@@ -65,6 +67,29 @@ class AdapterTest(unittest.TestCase):
                                cwd=root, check=True)
             (root / 'podman').mkdir()
             adapt(root)
+            # Extract a host archive with a UID outside typical rootless maps
+            # using exactly the command embedded in LocalDispatcher.start.
+            launcher = ast.parse((root / 'experiment/run_experiment.py').read_text())
+            extraction = next(node.value for node in ast.walk(launcher)
+                              if isinstance(node, ast.Constant) and
+                              isinstance(node.value, str) and
+                              'tar --no-same-owner -xvzf' in node.value)
+            archive = root / 'src.tar.gz'
+            with tarfile.open(archive, 'w:gz') as tar:
+                member = tarfile.TarInfo('test-source.py')
+                member.uid = member.gid = 3601848
+                member.mode = 0o755
+                member.size = 5
+                tar.addfile(member, io.BytesIO(b'pass\n'))
+            (root / 'src').mkdir()
+            command = extraction[extraction.index('tar --no-same-owner'):].split(' && ')[0]
+            subprocess.run(['bash', '-ec', command],
+                           env=dict(os.environ, WORK=str(root)),
+                           check=True, capture_output=True, text=True)
+            extracted = root / 'src/test-source.py'
+            self.assertEqual(extracted.stat().st_uid, os.geteuid())
+            self.assertEqual(extracted.stat().st_mode & 0o777, 0o755)
+            self.assertEqual(extracted.read_text(), 'pass\n')
             # Exercise the generator itself: the Makefile must not re-enable
             # BuildKit after the launcher disables it in the environment.
             generator = ast.parse((root / 'docker/generate_makefile.py').read_text())

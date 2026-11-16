@@ -37,6 +37,11 @@ def adapt(root):
             "            '-e', 'DOCKER_BUILDKIT=0',\n"
             "            '-e', 'FUZZBENCH_CPU_LIST=' + os.environ['FUZZBENCH_CPU_LIST'],")
     replace('experiment/run_experiment.py', "            '-ti',", "            '-i',")
+    # The host's numeric UID/GID need not exist in the rootless user namespace.
+    # Source files should belong to the extracting container user instead.
+    replace('experiment/run_experiment.py',
+            'tar -xvzf ${WORK}/src.tar.gz -C ${WORK}/src',
+            'tar --no-same-owner -xvzf ${WORK}/src.tar.gz -C ${WORK}/src')
     replace('docker/dispatcher-image/Dockerfile',
             'DOCKER_VERSION=18.09.7', 'DOCKER_VERSION=20.10.24')
     # Shared bind mounts need to be accessible to sibling containers on SELinux hosts.
